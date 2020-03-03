@@ -2,8 +2,8 @@ package pdftk_test
 
 import (
 	"bytes"
-	"github.com/patiek/go-pdf/fdf"
-	"github.com/patiek/go-pdf/pdftk"
+	"github.com/patiek/go-pdftools/fdf"
+	"github.com/patiek/go-pdftools/pdftk"
 	"log"
 	"os"
 )
