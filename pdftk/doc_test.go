@@ -115,3 +115,43 @@ func ExampleFillForm_file() {
 		// handle error
 	}
 }
+
+func ExampleBackground() {
+	backgroundFile, err := os.Open("background.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer backgroundFile.Close()
+
+	outFile, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer outFile.Close()
+
+	// add backgroundFile to background of input.pdf
+	err = pdftk.Background(outFile, "input.pdf", backgroundFile)
+	if err != nil {
+		// handle error
+	}
+}
+
+func ExampleStamp() {
+	stampFile, err := os.Open("stamp.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer stampFile.Close()
+
+	outFile, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer outFile.Close()
+
+	// stamp input.pdf with stampFile
+	err = pdftk.Stamp(outFile, "input.pdf", stampFile)
+	if err != nil {
+		// handle error
+	}
+}
