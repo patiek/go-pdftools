@@ -16,16 +16,24 @@ func NewInputFileMap(inputFileNames ...string) InputFileMap {
 }
 
 func (m InputFileMap) parameterize() []string {
-	// sort keys so that we can later properly handle dotted inputs
+	// Sort the keys by length and then by lexicographical.
+	// Sorting the keys allows for us to maintain order-matters relationships.
+	// Usually a map doesn't have order, but if they created our map via
+	// NewInputFileMap then we can maintain order for them.
 	keys := make([]string, len(m))
 	i := 0
 	for k := range m {
 		keys[i] = k
 		i++
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func (i, j int) bool {
+		if len(keys[i]) == len(keys[j]) {
+			return keys[i] < keys[j]
+		}
+		return len(keys[i]) < len(keys[j])
+	})
 
-	// turn in key=value parameter list
+	// turn into key=value parameter list
 	params := make([]string, len(m))
 	for i, k := range keys {
 		params[i] = k + "=" + m[k]
