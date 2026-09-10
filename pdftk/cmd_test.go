@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 		fmt.Println(strings.Join(os.Args[1:], " "))
 		_, _ = io.Copy(os.Stdout, os.Stdin)
 	case "dump_data":
-		if len(os.Args) != 5 || os.Args[2] != "dump_data" || os.Args[3] != "output" || os.Args[4] != "-" {
+		if len(os.Args) != 5 || !strings.HasPrefix(os.Args[1], "A=") || os.Args[2] != "dump_data" || os.Args[3] != "output" || os.Args[4] != "-" {
 			fmt.Fprintf(os.Stderr, "Error: unexpected arguments %q\n", os.Args[1:])
 			os.Exit(1)
 		}

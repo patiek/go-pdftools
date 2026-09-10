@@ -40,42 +40,42 @@ func TestCommands_arguments(t *testing.T) {
 			call: func(ctx context.Context, out io.Writer, options ...Option) error {
 				return FillForm(ctx, out, "in.pdf", strings.NewReader("fdf data"), options...)
 			},
-			want: "in.pdf fill_form - output -\nfdf data",
+			want: "A=in.pdf fill_form - output -\nfdf data",
 		},
 		{
 			name: "FillForm flatten",
 			call: func(ctx context.Context, out io.Writer, options ...Option) error {
 				return FillForm(ctx, out, "in.pdf", strings.NewReader("fdf data"), append(options, OptionFlatten())...)
 			},
-			want: "in.pdf fill_form - output - flatten\nfdf data",
+			want: "A=in.pdf fill_form - output - flatten\nfdf data",
 		},
 		{
 			name: "Background",
 			call: func(ctx context.Context, out io.Writer, options ...Option) error {
 				return Background(ctx, out, "in.pdf", strings.NewReader("pdf data"), options...)
 			},
-			want: "in.pdf background - output -\npdf data",
+			want: "A=in.pdf background - output -\npdf data",
 		},
 		{
 			name: "MultiBackground",
 			call: func(ctx context.Context, out io.Writer, options ...Option) error {
 				return MultiBackground(ctx, out, "in.pdf", strings.NewReader("pdf data"), options...)
 			},
-			want: "in.pdf multibackground - output -\npdf data",
+			want: "A=in.pdf multibackground - output -\npdf data",
 		},
 		{
 			name: "Stamp",
 			call: func(ctx context.Context, out io.Writer, options ...Option) error {
 				return Stamp(ctx, out, "in.pdf", strings.NewReader("pdf data"), options...)
 			},
-			want: "in.pdf stamp - output -\npdf data",
+			want: "A=in.pdf stamp - output -\npdf data",
 		},
 		{
 			name: "MultiStamp",
 			call: func(ctx context.Context, out io.Writer, options ...Option) error {
 				return MultiStamp(ctx, out, "in.pdf", strings.NewReader("pdf data"), options...)
 			},
-			want: "in.pdf multistamp - output -\npdf data",
+			want: "A=in.pdf multistamp - output -\npdf data",
 		},
 	}
 	for _, tt := range tests {

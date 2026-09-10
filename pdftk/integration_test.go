@@ -47,8 +47,7 @@ func writePDF(t *testing.T, name string, objects ...string) string {
 	return path
 }
 
-func writeBlankPDF(t *testing.T, pages int) string {
-	t.Helper()
+func blankPDFObjects(pages int) []string {
 	kids := make([]string, pages)
 	objects := []string{"<< /Type /Catalog /Pages 2 0 R >>", ""}
 	for i := range pages {
@@ -56,7 +55,12 @@ func writeBlankPDF(t *testing.T, pages int) string {
 		objects = append(objects, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>")
 	}
 	objects[1] = fmt.Sprintf("<< /Type /Pages /Kids [ %s ] /Count %d >>", strings.Join(kids, " "), pages)
-	return writePDF(t, fmt.Sprintf("blank%d.pdf", pages), objects...)
+	return objects
+}
+
+func writeBlankPDF(t *testing.T, pages int) string {
+	t.Helper()
+	return writePDF(t, fmt.Sprintf("blank%d.pdf", pages), blankPDFObjects(pages)...)
 }
 
 // Single page PDF with one text field named "name".
@@ -207,6 +211,36 @@ func TestOverlays_pdftk(t *testing.T) {
 			})
 			if got != 3 {
 				t.Errorf("%s() produced %d pages, want 3", tt.name, got)
+			}
+		})
+	}
+}
+
+// File names that look like a handle or an operation must still be usable.
+func TestInputFileNames_pdftk(t *testing.T) {
+	requirePDFtk(t)
+	for _, name := range []string{"cat", "X=blank.pdf"} {
+		t.Run(name, func(t *testing.T) {
+			// pdftk only misparses bare names, so run it from the file's directory
+			t.Chdir(filepath.Dir(writePDF(t, name, blankPDFObjects(3)...)))
+			inputFileName := name
+			got, err := NumberOfPages(t.Context(), inputFileName)
+			if err != nil {
+				t.Fatalf("NumberOfPages() error = %v", err)
+			}
+			if got != 3 {
+				t.Errorf("NumberOfPages() = %d, want 3", got)
+			}
+
+			stamp, err := os.Open(writeBlankPDF(t, 1))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stamp.Close()
+			if got := outputPages(t, func(out io.Writer) error {
+				return Stamp(t.Context(), out, inputFileName, stamp)
+			}); got != 3 {
+				t.Errorf("Stamp() produced %d pages, want 3", got)
 			}
 		})
 	}
