@@ -17,8 +17,8 @@ const (
 // The left, right, and down rotations make relative adjustments to page
 // and must follow other page range adjustments.
 //
-// 	north: 0, east: 90, south: 180, west: 270
-// 	left: -90, right: +90, down: +180
+//	north: 0, east: 90, south: 180, west: 270
+//	left: -90, right: +90, down: +180
 type PageRangeRotation string
 
 const (

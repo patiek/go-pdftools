@@ -70,7 +70,7 @@ func writeFields(w io.Writer, inputs Inputs, keys []string, parentPrefix string)
 
 			var (
 				hidden, readOnly bool
-				input            interface{}
+				input            any
 			)
 
 			input = inputs[keys[i]]

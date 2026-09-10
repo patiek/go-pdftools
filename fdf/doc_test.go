@@ -2,11 +2,12 @@ package fdf_test
 
 import (
 	"bytes"
-	"github.com/patiek/go-pdftools/fdf"
 	"os"
+
+	"github.com/patiek/go-pdftools/fdf"
 )
 
-func ExampleWriteFDF() {
+func ExampleWrite() {
 	var (
 		b   bytes.Buffer
 		err error
@@ -33,10 +34,13 @@ func ExampleWriteFDF() {
 }
 
 func ExampleOptionInput() {
-	inputs := fdf.Inputs{
+	var b bytes.Buffer
+	err := fdf.Write(&b, fdf.Inputs{
 		"foo": fdf.OptionInput("Yes"), // mark field "foo" as checked
 		"bar": "field 2 value",
 		"baz": fdf.OptionInput("United States"), // select the value "United States" for field "baz"
+	})
+	if err != nil {
+		// handle error
 	}
-	// fdf.Write(w, inputs)
 }

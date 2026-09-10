@@ -26,7 +26,7 @@ func (m InputFileMap) parameterize() []string {
 		keys[i] = k
 		i++
 	}
-	sort.Slice(keys, func (i, j int) bool {
+	sort.Slice(keys, func(i, j int) bool {
 		if len(keys[i]) == len(keys[j]) {
 			return keys[i] < keys[j]
 		}

@@ -2,10 +2,14 @@ package pdftk_test
 
 import (
 	"bytes"
-	"github.com/patiek/go-pdftools/fdf"
-	"github.com/patiek/go-pdftools/pdftk"
+	"context"
+	"fmt"
 	"log"
 	"os"
+	"time"
+
+	"github.com/patiek/go-pdftools/fdf"
+	"github.com/patiek/go-pdftools/pdftk"
 )
 
 func ExampleCat() {
@@ -15,7 +19,7 @@ func ExampleCat() {
 		// handle error
 	}
 
-	err = pdftk.Cat(f, pdftk.NewInputFileMap("first.pdf", "second.pdf", "third.pdf"), []pdftk.PageRange{
+	err = pdftk.Cat(context.Background(), f, pdftk.NewInputFileMap("first.pdf", "second.pdf", "third.pdf"), []pdftk.PageRange{
 		{
 			FileHandleName: pdftk.InputHandleNameFromInt(1),
 			Rotation:       pdftk.East,
@@ -68,7 +72,7 @@ func ExampleCat_pageRanges() {
 		},
 	}
 
-	err = pdftk.Cat(f, inputFiles, pageRanges)
+	err = pdftk.Cat(context.Background(), f, inputFiles, pageRanges)
 	if err != nil {
 		// handle error
 	}
@@ -90,7 +94,7 @@ func ExampleFillForm() {
 	defer f.Close()
 
 	// fill form with FDF data from buffer b and flatten
-	err = pdftk.FillForm(f, "test.pdf", &b, pdftk.OptionFlatten())
+	err = pdftk.FillForm(context.Background(), f, "test.pdf", &b, pdftk.OptionFlatten())
 	if err != nil {
 		// handle error
 	}
@@ -110,9 +114,32 @@ func ExampleFillForm_file() {
 	defer outFile.Close()
 
 	// fill form with FDF data from FDF file and flatten
-	err = pdftk.FillForm(outFile, "test.pdf", fdfFile, pdftk.OptionFlatten())
+	err = pdftk.FillForm(context.Background(), outFile, "test.pdf", fdfFile, pdftk.OptionFlatten())
 	if err != nil {
 		// handle error
+	}
+}
+
+func ExampleFillForm_timeout() {
+	fdfFile, err := os.Open("input.fdf")
+	if err != nil {
+		// handle error
+	}
+	defer fdfFile.Close()
+
+	outFile, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer outFile.Close()
+
+	// give pdftk at most 30 seconds to fill the form
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	err = pdftk.FillForm(ctx, outFile, "test.pdf", fdfFile)
+	if err != nil {
+		// handle error, errors.Is(err, context.DeadlineExceeded) on timeout
 	}
 }
 
@@ -130,7 +157,7 @@ func ExampleBackground() {
 	defer outFile.Close()
 
 	// add backgroundFile to background of input.pdf
-	err = pdftk.Background(outFile, "input.pdf", backgroundFile)
+	err = pdftk.Background(context.Background(), outFile, "input.pdf", backgroundFile)
 	if err != nil {
 		// handle error
 	}
@@ -150,8 +177,25 @@ func ExampleStamp() {
 	defer outFile.Close()
 
 	// stamp input.pdf with stampFile
-	err = pdftk.Stamp(outFile, "input.pdf", stampFile)
+	err = pdftk.Stamp(context.Background(), outFile, "input.pdf", stampFile)
 	if err != nil {
 		// handle error
 	}
+}
+
+func ExampleNumberOfPages() {
+	pages, err := pdftk.NumberOfPages(context.Background(), "input.pdf")
+	if err != nil {
+		// handle error
+	}
+	fmt.Println(pages)
+}
+
+func ExampleOptionExecutable() {
+	// use pdftk-java installed under a different name
+	pages, err := pdftk.NumberOfPages(context.Background(), "input.pdf", pdftk.OptionExecutable("pdftk-java"))
+	if err != nil {
+		// handle error
+	}
+	fmt.Println(pages)
 }
