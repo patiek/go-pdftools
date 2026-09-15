@@ -13,13 +13,26 @@ import (
 )
 
 func ExampleCat() {
-	// file to write output into
-	f, err := os.Create("out.pdf")
+	first, err := os.Open("first.pdf")
 	if err != nil {
 		// handle error
 	}
+	defer first.Close()
 
-	err = pdftk.Cat(context.Background(), f, pdftk.NewInputFileMap("first.pdf", "second.pdf", "third.pdf"), []pdftk.PageRange{
+	second, err := os.Open("second.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer second.Close()
+
+	// file to write output into
+	out, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer out.Close()
+
+	err = pdftk.Cat(context.Background(), out, pdftk.NewInputMap(first, second), []pdftk.PageRange{
 		{
 			FileHandleName: pdftk.InputHandleNameFromInt(1),
 			Rotation:       pdftk.East,
@@ -34,17 +47,32 @@ func ExampleCat() {
 }
 
 func ExampleCat_pageRanges() {
-	// file to write output into
-	f, err := os.Create("out.pdf")
+	first, err := os.Open("first.pdf")
 	if err != nil {
 		// handle error
 	}
+	defer first.Close()
 
-	inputFiles := pdftk.InputFileMap{
-		"A": "first.pdf",
-		"B": "second.pdf",
-		"C": "third.pdf",
+	second, err := os.Open("second.pdf")
+	if err != nil {
+		// handle error
 	}
+	defer second.Close()
+
+	third, err := os.Open("third.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer third.Close()
+
+	inputs := pdftk.InputMap{"A": first, "B": second, "C": third}
+
+	// file to write output into
+	out, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer out.Close()
 
 	pageRanges := []pdftk.PageRange{
 		// first we take page 2 from C
@@ -72,7 +100,7 @@ func ExampleCat_pageRanges() {
 		},
 	}
 
-	err = pdftk.Cat(context.Background(), f, inputFiles, pageRanges)
+	err = pdftk.Cat(context.Background(), out, inputs, pageRanges)
 	if err != nil {
 		// handle error
 	}
@@ -87,104 +115,133 @@ func ExampleFillForm() {
 		// handle error
 	}
 
-	f, err := os.Create("out.pdf")
+	form, err := os.Open("form.pdf")
 	if err != nil {
 		// handle error
 	}
-	defer f.Close()
+	defer form.Close()
+
+	out, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer out.Close()
 
 	// fill form with FDF data from buffer b and flatten
-	err = pdftk.FillForm(context.Background(), f, "test.pdf", &b, pdftk.OptionFlatten())
+	err = pdftk.FillForm(context.Background(), out, form, &b, pdftk.OptionFlatten())
 	if err != nil {
 		// handle error
 	}
 }
 
 func ExampleFillForm_file() {
+	form, err := os.Open("form.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer form.Close()
+
 	fdfFile, err := os.Open("input.fdf")
 	if err != nil {
 		// handle error
 	}
 	defer fdfFile.Close()
 
-	outFile, err := os.Create("out.pdf")
+	out, err := os.Create("out.pdf")
 	if err != nil {
 		// handle error
 	}
-	defer outFile.Close()
+	defer out.Close()
 
 	// fill form with FDF data from FDF file and flatten
-	err = pdftk.FillForm(context.Background(), outFile, "test.pdf", fdfFile, pdftk.OptionFlatten())
+	err = pdftk.FillForm(context.Background(), out, form, fdfFile, pdftk.OptionFlatten())
 	if err != nil {
 		// handle error
 	}
 }
 
 func ExampleFillForm_timeout() {
+	form, err := os.Open("form.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer form.Close()
+
 	fdfFile, err := os.Open("input.fdf")
 	if err != nil {
 		// handle error
 	}
 	defer fdfFile.Close()
 
-	outFile, err := os.Create("out.pdf")
+	out, err := os.Create("out.pdf")
 	if err != nil {
 		// handle error
 	}
-	defer outFile.Close()
+	defer out.Close()
 
 	// give pdftk at most 30 seconds to fill the form
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err = pdftk.FillForm(ctx, outFile, "test.pdf", fdfFile)
+	err = pdftk.FillForm(ctx, out, form, fdfFile)
 	if err != nil {
 		// handle error, errors.Is(err, context.DeadlineExceeded) on timeout
 	}
 }
 
 func ExampleBackground() {
-	backgroundFile, err := os.Open("background.pdf")
+	in, err := os.Open("input.pdf")
 	if err != nil {
 		// handle error
 	}
-	defer backgroundFile.Close()
+	defer in.Close()
 
-	outFile, err := os.Create("out.pdf")
+	background, err := os.Open("background.pdf")
 	if err != nil {
 		// handle error
 	}
-	defer outFile.Close()
+	defer background.Close()
 
-	// add backgroundFile to background of input.pdf
-	err = pdftk.Background(context.Background(), outFile, "input.pdf", backgroundFile)
+	out, err := os.Create("out.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer out.Close()
+
+	// add background to every page of in
+	err = pdftk.Background(context.Background(), out, in, background)
 	if err != nil {
 		// handle error
 	}
 }
 
 func ExampleStamp() {
-	stampFile, err := os.Open("stamp.pdf")
+	// PDF held in memory, e.g. downloaded or generated
+	var pdfData []byte
+
+	stamp, err := os.Open("stamp.pdf")
 	if err != nil {
 		// handle error
 	}
-	defer stampFile.Close()
+	defer stamp.Close()
 
-	outFile, err := os.Create("out.pdf")
-	if err != nil {
-		// handle error
-	}
-	defer outFile.Close()
+	var out bytes.Buffer
 
-	// stamp input.pdf with stampFile
-	err = pdftk.Stamp(context.Background(), outFile, "input.pdf", stampFile)
+	// stamp every page of pdfData and keep the result in memory
+	err = pdftk.Stamp(context.Background(), &out, bytes.NewReader(pdfData), stamp)
 	if err != nil {
 		// handle error
 	}
 }
 
 func ExampleNumberOfPages() {
-	pages, err := pdftk.NumberOfPages(context.Background(), "input.pdf")
+	in, err := os.Open("input.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer in.Close()
+
+	pages, err := pdftk.NumberOfPages(context.Background(), in)
 	if err != nil {
 		// handle error
 	}
@@ -192,10 +249,27 @@ func ExampleNumberOfPages() {
 }
 
 func ExampleOptionExecutable() {
+	in, err := os.Open("input.pdf")
+	if err != nil {
+		// handle error
+	}
+	defer in.Close()
+
 	// use pdftk-java installed under a different name
-	pages, err := pdftk.NumberOfPages(context.Background(), "input.pdf", pdftk.OptionExecutable("pdftk-java"))
+	pages, err := pdftk.NumberOfPages(context.Background(), in, pdftk.OptionExecutable("pdftk-java"))
 	if err != nil {
 		// handle error
 	}
 	fmt.Println(pages)
+}
+
+func ExampleOptionTempDir() {
+	var pdfData, stampData []byte
+
+	// in-memory inputs are copied to files under /var/tmp for pdftk to read
+	var out bytes.Buffer
+	err := pdftk.Stamp(context.Background(), &out, bytes.NewReader(pdfData), bytes.NewReader(stampData), pdftk.OptionTempDir("/var/tmp"))
+	if err != nil {
+		// handle error
+	}
 }

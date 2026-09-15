@@ -32,7 +32,7 @@ const (
 )
 
 type PageRange struct {
-	// The file handle name to reference (a key in InputFileMap).
+	// The handle name to reference (a key in InputMap).
 	FileHandleName string
 
 	// Optional rotation of page range
