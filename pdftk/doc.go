@@ -3,9 +3,11 @@ Package pdftk provides wrapper functions for calling PDFtk commands.
 
 Expects command line executable of pdftk or pdftk-java to be installed.
 
-Commands that take an io.Reader do not return while that reader is blocked in
-Read, even after ctx is done, so pass an *os.File or in-memory reader when the
-call must be bounded.
+Inputs are io.Readers, read at most once and never closed. An unread regular
+*os.File is passed to pdftk by name and left unread. Any other reader is
+copied to a temp file first (see OptionTempDir) because pdftk needs seekable
+files and would hold a whole stdin input in memory. Copying stops between
+Reads once ctx is done but cannot interrupt a blocked Read.
 
 By: Patrick Brown
 */

@@ -1,44 +1,35 @@
 package pdftk
 
 import (
-	"sort"
+	"cmp"
+	"io"
+	"maps"
+	"slices"
 	"strconv"
+	"strings"
 )
 
-type InputFileMap map[string]string
+// Input PDFs for Cat keyed by handle name (uppercase A-Z), which PageRange
+// refers to. Readers are read at most once and never closed.
+type InputMap map[string]io.Reader
 
-func NewInputFileMap(inputFileNames ...string) InputFileMap {
-	m := make(InputFileMap)
-	for i, f := range inputFileNames {
-		m[InputHandleNameFromInt(i)] = f
+// Assign handles A, B, C, ... to inputs in order.
+func NewInputMap(inputs ...io.Reader) InputMap {
+	m := make(InputMap, len(inputs))
+	for i, r := range inputs {
+		m[InputHandleNameFromInt(i)] = r
 	}
 	return m
 }
 
-func (m InputFileMap) parameterize() []string {
-	// Sort the keys by length and then by lexicographical.
-	// Sorting the keys allows for us to maintain order-matters relationships.
-	// Usually a map doesn't have order, but if they created our map via
-	// NewInputFileMap then we can maintain order for them.
-	keys := make([]string, len(m))
-	i := 0
-	for k := range m {
-		keys[i] = k
-		i++
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if len(keys[i]) == len(keys[j]) {
-			return keys[i] < keys[j]
-		}
-		return len(keys[i]) < len(keys[j])
+// Handles sorted by length and then lexicographically, so a map built by
+// NewInputMap keeps its argument order.
+func (m InputMap) handles() []string {
+	handles := slices.Collect(maps.Keys(m))
+	slices.SortFunc(handles, func(a, b string) int {
+		return cmp.Or(cmp.Compare(len(a), len(b)), strings.Compare(a, b))
 	})
-
-	// turn into key=value parameter list
-	params := make([]string, len(m))
-	for i, k := range keys {
-		params[i] = k + "=" + m[k]
-	}
-	return params
+	return handles
 }
 
 // Get valid input handle name (A-Z characters only) by converting num to A-Z base 26
