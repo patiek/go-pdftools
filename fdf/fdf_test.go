@@ -51,10 +51,9 @@ func Test_escapeOptionedInput(t *testing.T) {
 		v OptionInput
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name string
+		args args
+		want string
 	}{
 		{
 			name: "optioned input properly escaped",
@@ -77,24 +76,19 @@ func Test_escapeOptionedInput(t *testing.T) {
 			want: "S#c3#ad",
 		},
 		{
+			name: "above latin-1 as utf-8",
+			args: args{v: OptionInput("Sí車")},
+			want: "S#c3#ad#e8#bb#8a",
+		},
+		{
 			name: "invalid utf-8 bytes kept",
 			args: args{v: OptionInput("Espa\xf1a")},
 			want: "Espa#f1a",
 		},
-		{
-			name:    "above latin-1",
-			args:    args{v: OptionInput("車")},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := escapeOptionedInput(tt.args.v)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("escapeOptionedInput() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
+			if got := escapeOptionedInput(tt.args.v); got != tt.want {
 				t.Errorf("escapeOptionedInput()\nresult = %q,\n\twant = %q", got, tt.want)
 			}
 		})
@@ -214,15 +208,6 @@ func Test_writeFields(t *testing.T) {
 				`<< /T (option) /V /S#ed /ClrF 2 /ClrFf 1 >> ` + "\r",
 			wantErr: false,
 		},
-		{
-			name: "option above latin-1",
-			args: args{
-				inputs:       Inputs{"option": OptionInput("車")},
-				keys:         []string{"option"},
-				parentPrefix: "",
-			},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -230,9 +215,6 @@ func Test_writeFields(t *testing.T) {
 			err := writeFields(w, tt.args.inputs, tt.args.keys, tt.args.parentPrefix)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeFields() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if err != nil {
 				return
 			}
 			if gotW := w.String(); gotW != tt.wantW {

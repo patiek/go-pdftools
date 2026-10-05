@@ -93,11 +93,7 @@ func writeFields(w io.Writer, inputs Inputs, keys []string, parentPrefix string)
 			// field value
 			switch v := input.(type) {
 			case OptionInput:
-				name, err := escapeOptionedInput(v)
-				if err != nil {
-					return fmt.Errorf("invalid option for input key %s: %w", keys[i], err)
-				}
-				_, _ = fmt.Fprintf(w, "/V /%s ", name)
+				_, _ = fmt.Fprintf(w, "/V /%s ", escapeOptionedInput(v))
 			case fmt.Stringer:
 				_, _ = fmt.Fprintf(w, "/V (%s) ", escapeTextValue(v.String()))
 			case string:
@@ -126,19 +122,18 @@ func writeFields(w io.Writer, inputs Inputs, keys []string, parentPrefix string)
 }
 
 // Each character is written as one Latin-1 byte, since pdftk reads names that way.
-func escapeOptionedInput(s OptionInput) (string, error) {
-	var b strings.Builder
-	for i := 0; i < len(s); {
-		r, size := utf8.DecodeRuneInString(string(s[i:]))
-		c := s[i]
-		if size > 1 {
-			if r > 0xff {
-				return "", fmt.Errorf("%q (%U) is not Latin-1", r, r)
-			}
-			c = byte(r)
+// An option with characters above U+00FF is written as UTF-8 instead.
+func escapeOptionedInput(s OptionInput) string {
+	name := []byte(s)
+	if !strings.ContainsFunc(string(s), func(r rune) bool { return r > 0xff }) {
+		name = name[:0]
+		for _, r := range string(s) {
+			name = append(name, byte(r))
 		}
-		i += size
+	}
 
+	var b strings.Builder
+	for _, c := range name {
 		switch {
 		case c <= ' ', c > '~', strings.IndexByte("#()<>[]{}/%", c) >= 0:
 			// convert to hex
@@ -148,7 +143,7 @@ func escapeOptionedInput(s OptionInput) (string, error) {
 		}
 	}
 
-	return b.String(), nil
+	return b.String()
 }
 
 func escapeStringInput(s string) string {

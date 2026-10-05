@@ -321,27 +321,38 @@ func TestFillFormText_pdftk(t *testing.T) {
 func TestFillFormOption_pdftk(t *testing.T) {
 	requirePDFtk(t)
 	checkbox := "/FT /Btn /V /Off /AS /Off /AP << /N << /Off 6 0 R /%s 6 0 R >> >>"
-	fields := []string{
-		fmt.Sprintf(checkbox, "Yes"),
-		fmt.Sprintf(checkbox, "United#20States"),
-		fmt.Sprintf(checkbox, "a#2fb#28c#29#3cd#3e#5be#5d#7bf#7d#25g#23"),
-		fmt.Sprintf(checkbox, "S#ed"),
-		fmt.Sprintf(checkbox, "S#c3#ad"),
-		"/FT /Ch /Ff 131072 /DA (/Helv 12 Tf 0 g) /Opt [ (Espa\\361a) (United States) ]",
+	fields := []struct {
+		entries string
+		typed   string // also selects the one listed option
+	}{
+		{entries: fmt.Sprintf(checkbox, "Yes")},
+		{entries: fmt.Sprintf(checkbox, "United#20States")},
+		{entries: fmt.Sprintf(checkbox, "a#2fb#28c#29#3cd#3e#5be#5d#7bf#7d#25g#23")},
+		{entries: fmt.Sprintf(checkbox, "S#ed")},
+		// UTF-8 name, listed by pdftk as Latin-1
+		{entries: fmt.Sprintf(checkbox, "S#c3#ad#e8#bb#8a"), typed: "Sí車"},
+		{entries: "/FT /Ch /Ff 131072 /DA (/Helv 12 Tf 0 g) /Opt [ (Espa\\361a) (United States) ]"},
 	}
-	for _, entries := range fields {
-		form := writePDF(t, "form.pdf", fieldPDFObjects(entries)...)
+	for _, field := range fields {
+		form := writePDF(t, "form.pdf", fieldPDFObjects(field.entries)...)
 		options := slices.DeleteFunc(fieldData(t, form, "FieldStateOption"), func(o string) bool { return o == "Off" })
 		if len(options) == 0 {
-			t.Fatalf("no options listed for %s", entries)
+			t.Fatalf("no options listed for %s", field.entries)
 		}
+		inputs := make(map[string]string)
 		for _, option := range options {
-			t.Run(option, func(t *testing.T) {
+			inputs[option] = option
+		}
+		if field.typed != "" {
+			inputs[field.typed] = options[0]
+		}
+		for input, want := range inputs {
+			t.Run(input, func(t *testing.T) {
 				out := writeOutput(t, func(out io.Writer) error {
-					return FillForm(t.Context(), out, openFile(t, form), strings.NewReader(fdfData(t, fdf.OptionInput(option))))
+					return FillForm(t.Context(), out, openFile(t, form), strings.NewReader(fdfData(t, fdf.OptionInput(input))))
 				})
-				if got := fieldValue(t, out); got != option {
-					t.Errorf("filled form field = %q, want %q", got, option)
+				if got := fieldValue(t, out); got != want {
+					t.Errorf("filled form field = %q, want %q", got, want)
 				}
 			})
 		}
