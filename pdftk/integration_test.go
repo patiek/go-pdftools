@@ -120,7 +120,7 @@ func outputPages(t *testing.T, fn func(out io.Writer) error) int {
 	return n
 }
 
-// Value of the form field "name" in the PDF at path, via dump_data_fields.
+// Value of the form field "name" in the PDF at path, via dump_data_fields_utf8.
 func fieldValue(t *testing.T, path string) string {
 	t.Helper()
 	var fields bytes.Buffer
@@ -128,7 +128,7 @@ func fieldValue(t *testing.T, path string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cmd.run(path, "dump_data_fields", "output", "-"); err != nil {
+	if err := cmd.run(path, "dump_data_fields_utf8", "output", "-"); err != nil {
 		t.Fatal(err)
 	}
 	for line := range strings.Lines(fields.String()) {
@@ -281,6 +281,22 @@ func TestFillForm_pdftk(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// FDF text values must read back from the filled form unchanged.
+func TestFillFormText_pdftk(t *testing.T) {
+	requirePDFtk(t)
+	values := []string{"1FT(J)W\\35", "José Muñoz", "José (Muñoz) \\ 車", "😀 Ünïcödé"}
+	for _, value := range values {
+		t.Run(value, func(t *testing.T) {
+			out := writeOutput(t, func(out io.Writer) error {
+				return FillForm(t.Context(), out, bytes.NewReader(pdfBytes(formPDFObjects()...)), strings.NewReader(fdfData(t, value)))
+			})
+			if got := fieldValue(t, out); got != value {
+				t.Errorf("filled form field = %q, want %q", got, value)
+			}
+		})
 	}
 }
 

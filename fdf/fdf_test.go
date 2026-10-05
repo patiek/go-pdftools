@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+type stringer string
+
+func (s stringer) String() string { return string(s) }
+
 func TestWriteFDF(t *testing.T) {
 	type args struct {
 		inputs Inputs
@@ -90,6 +94,52 @@ func Test_escapeStringInput(t *testing.T) {
 	}
 }
 
+func Test_escapeTextValue(t *testing.T) {
+	tests := []struct {
+		name string
+		s    string
+		want string
+	}{
+		{
+			name: "ascii same as escapeStringInput",
+			s:    "foo (bar) \\ baz \nbuz\r \\)( end\177",
+			want: "foo \\(bar\\) \\\\ baz \\012buz\\015 \\\\\\)\\( end\\177",
+		},
+		{
+			name: "empty",
+			s:    "",
+			want: "",
+		},
+		{
+			name: "non-ascii as utf-16be with bom",
+			s:    "José",
+			want: `\376\377\000\112\000\157\000\163\000\351`,
+		},
+		{
+			name: "delimiters in non-ascii escaped",
+			s:    "é()\\",
+			want: `\376\377\000\351\000\050\000\051\000\134`,
+		},
+		{
+			name: "astral as surrogate pair",
+			s:    "😀",
+			want: `\376\377\330\075\336\000`,
+		},
+		{
+			name: "invalid utf-8 replaced",
+			s:    "a\xff",
+			want: `\376\377\000\141\377\375`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := escapeTextValue(tt.s); got != tt.want {
+				t.Errorf("escapeTextValue()\nresult = %q,\n\twant = %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_writeFields(t *testing.T) {
 	type args struct {
 		inputs       Inputs
@@ -113,6 +163,24 @@ func Test_writeFields(t *testing.T) {
 				parentPrefix: "",
 			},
 			wantW:   "<< /T (foo) /V (foo val) /ClrF 2 /ClrFf 1 >> \r<< /T (bar) /V (bar val) /ClrF 2 /ClrFf 1 >> \r",
+			wantErr: false,
+		},
+		{
+			name: "non-ascii text values",
+			args: args{
+				inputs: Inputs{
+					"str":    "é",
+					"strer":  stringer("ñ"),
+					"field":  Field{ReadOnly: true, Value: "ü"},
+					"option": OptionInput("Ja"),
+				},
+				keys:         []string{"str", "strer", "field", "option"},
+				parentPrefix: "",
+			},
+			wantW: `<< /T (str) /V (\376\377\000\351) /ClrF 2 /ClrFf 1 >> ` + "\r" +
+				`<< /T (strer) /V (\376\377\000\361) /ClrF 2 /ClrFf 1 >> ` + "\r" +
+				`<< /T (field) /V (\376\377\000\374) /ClrF 2 /SetFf 1 >> ` + "\r" +
+				`<< /T (option) /V /Ja /ClrF 2 /ClrFf 1 >> ` + "\r",
 			wantErr: false,
 		},
 	}

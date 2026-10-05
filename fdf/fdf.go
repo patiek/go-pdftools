@@ -5,6 +5,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 const fdfHeader = "%FDF-1.2\r%\xe2\xe3\xcf\xd3\r\n1 0 obj\r<< \r/FDF << /Fields [ "
@@ -93,9 +95,9 @@ func writeFields(w io.Writer, inputs Inputs, keys []string, parentPrefix string)
 			case OptionInput:
 				_, _ = fmt.Fprintf(w, "/V /%s ", escapeOptionedInput(v))
 			case fmt.Stringer:
-				_, _ = fmt.Fprintf(w, "/V (%s) ", escapeStringInput(v.String()))
+				_, _ = fmt.Fprintf(w, "/V (%s) ", escapeTextValue(v.String()))
 			case string:
-				_, _ = fmt.Fprintf(w, "/V (%s) ", escapeStringInput(v))
+				_, _ = fmt.Fprintf(w, "/V (%s) ", escapeTextValue(v))
 			default:
 				return fmt.Errorf("invalid type for input key %s: %T", keys[i], v)
 			}
@@ -148,6 +150,22 @@ func escapeStringInput(s string) string {
 		default:
 			b.WriteByte(s[i])
 		}
+	}
+
+	return b.String()
+}
+
+// Non-ASCII text is written as UTF-16BE behind a byte-order mark, since pdftk
+// reads a string without one as PDFDocEncoding.
+func escapeTextValue(s string) string {
+	if strings.IndexFunc(s, func(r rune) bool { return r >= utf8.RuneSelf }) < 0 {
+		return escapeStringInput(s)
+	}
+
+	var b strings.Builder
+	b.WriteString(`\376\377`)
+	for _, u := range utf16.Encode([]rune(s)) {
+		_, _ = fmt.Fprintf(&b, `\%03o\%03o`, u>>8, u&0xff)
 	}
 
 	return b.String()
