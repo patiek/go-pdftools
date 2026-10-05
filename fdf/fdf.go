@@ -93,7 +93,11 @@ func writeFields(w io.Writer, inputs Inputs, keys []string, parentPrefix string)
 			// field value
 			switch v := input.(type) {
 			case OptionInput:
-				_, _ = fmt.Fprintf(w, "/V /%s ", escapeOptionedInput(v))
+				name, err := escapeOptionedInput(v)
+				if err != nil {
+					return fmt.Errorf("invalid option for input key %s: %w", keys[i], err)
+				}
+				_, _ = fmt.Fprintf(w, "/V /%s ", name)
 			case fmt.Stringer:
 				_, _ = fmt.Fprintf(w, "/V (%s) ", escapeTextValue(v.String()))
 			case string:
@@ -121,19 +125,30 @@ func writeFields(w io.Writer, inputs Inputs, keys []string, parentPrefix string)
 	return nil
 }
 
-func escapeOptionedInput(s OptionInput) string {
+// Each character is written as one Latin-1 byte, since pdftk reads names that way.
+func escapeOptionedInput(s OptionInput) (string, error) {
 	var b strings.Builder
-	for i := range s {
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(string(s[i:]))
+		c := s[i]
+		if size > 1 {
+			if r > 0xff {
+				return "", fmt.Errorf("%q (%U) is not Latin-1", r, r)
+			}
+			c = byte(r)
+		}
+		i += size
+
 		switch {
-		case s[i] == '#', s[i] < 32, s[i] > 126:
+		case c <= ' ', c > '~', strings.IndexByte("#()<>[]{}/%", c) >= 0:
 			// convert to hex
-			_, _ = fmt.Fprintf(&b, "#%02x", s[i])
+			_, _ = fmt.Fprintf(&b, "#%02x", c)
 		default:
-			b.WriteByte(s[i])
+			b.WriteByte(c)
 		}
 	}
 
-	return b.String()
+	return b.String(), nil
 }
 
 func escapeStringInput(s string) string {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,16 +70,23 @@ func openBlankPDF(t *testing.T, pages int) *os.File {
 
 // Single page PDF with one text field named "name".
 func formPDFObjects() []string {
+	return fieldPDFObjects("/FT /Tx /DA (/Helv 12 Tf 0 g)")
+}
+
+// Single page PDF with one field named "name" made of entries.
+// Object 6 is an empty stream for appearances.
+func fieldPDFObjects(entries string) []string {
 	return []string{
 		"<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [ 4 0 R ] /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 5 0 R >> >> >> >>",
 		"<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>",
 		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [ 4 0 R ] >>",
-		"<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /Rect [50 700 300 720] /F 4 /P 3 0 R /DA (/Helv 12 Tf 0 g) >>",
+		"<< /Type /Annot /Subtype /Widget /T (name) /Rect [50 700 300 720] /F 4 /P 3 0 R " + entries + " >>",
 		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+		"<< /Length 0 >>\nstream\n\nendstream",
 	}
 }
 
-func fdfData(t *testing.T, value string) string {
+func fdfData(t *testing.T, value any) string {
 	t.Helper()
 	var b bytes.Buffer
 	if err := fdf.Write(&b, fdf.Inputs{"name": value}); err != nil {
@@ -120,8 +128,8 @@ func outputPages(t *testing.T, fn func(out io.Writer) error) int {
 	return n
 }
 
-// Value of the form field "name" in the PDF at path, via dump_data_fields_utf8.
-func fieldValue(t *testing.T, path string) string {
+// Values of key for the form field "name" in the PDF at path, via dump_data_fields_utf8.
+func fieldData(t *testing.T, path, key string) []string {
 	t.Helper()
 	var fields bytes.Buffer
 	cmd, err := newCommand(t.Context(), &fields, nil)
@@ -131,10 +139,19 @@ func fieldValue(t *testing.T, path string) string {
 	if err := cmd.run(path, "dump_data_fields_utf8", "output", "-"); err != nil {
 		t.Fatal(err)
 	}
+	var values []string
 	for line := range strings.Lines(fields.String()) {
-		if v, ok := strings.CutPrefix(line, "FieldValue: "); ok {
-			return strings.TrimSpace(v)
+		if v, ok := strings.CutPrefix(line, key+": "); ok {
+			values = append(values, strings.TrimSpace(v))
 		}
+	}
+	return values
+}
+
+func fieldValue(t *testing.T, path string) string {
+	t.Helper()
+	if values := fieldData(t, path, "FieldValue"); len(values) > 0 {
+		return values[0]
 	}
 	return ""
 }
@@ -297,6 +314,37 @@ func TestFillFormText_pdftk(t *testing.T) {
 				t.Errorf("filled form field = %q, want %q", got, value)
 			}
 		})
+	}
+}
+
+// An option listed by pdftk for a field must select it when filled as an OptionInput.
+func TestFillFormOption_pdftk(t *testing.T) {
+	requirePDFtk(t)
+	checkbox := "/FT /Btn /V /Off /AS /Off /AP << /N << /Off 6 0 R /%s 6 0 R >> >>"
+	fields := []string{
+		fmt.Sprintf(checkbox, "Yes"),
+		fmt.Sprintf(checkbox, "United#20States"),
+		fmt.Sprintf(checkbox, "a#2fb#28c#29#3cd#3e#5be#5d#7bf#7d#25g#23"),
+		fmt.Sprintf(checkbox, "S#ed"),
+		fmt.Sprintf(checkbox, "S#c3#ad"),
+		"/FT /Ch /Ff 131072 /DA (/Helv 12 Tf 0 g) /Opt [ (Espa\\361a) (United States) ]",
+	}
+	for _, entries := range fields {
+		form := writePDF(t, "form.pdf", fieldPDFObjects(entries)...)
+		options := slices.DeleteFunc(fieldData(t, form, "FieldStateOption"), func(o string) bool { return o == "Off" })
+		if len(options) == 0 {
+			t.Fatalf("no options listed for %s", entries)
+		}
+		for _, option := range options {
+			t.Run(option, func(t *testing.T) {
+				out := writeOutput(t, func(out io.Writer) error {
+					return FillForm(t.Context(), out, openFile(t, form), strings.NewReader(fdfData(t, fdf.OptionInput(option))))
+				})
+				if got := fieldValue(t, out); got != option {
+					t.Errorf("filled form field = %q, want %q", got, option)
+				}
+			})
+		}
 	}
 }
 

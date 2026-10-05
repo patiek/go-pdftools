@@ -51,19 +51,50 @@ func Test_escapeOptionedInput(t *testing.T) {
 		v OptionInput
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		args    args
+		want    string
+		wantErr bool
 	}{
 		{
 			name: "optioned input properly escaped",
 			args: args{v: OptionInput("foo #bar ##baz \r buz \n end\177")},
-			want: "foo #23bar #23#23baz #0d buz #0a end#7f",
+			want: "foo#20#23bar#20#23#23baz#20#0d#20buz#20#0a#20end#7f",
+		},
+		{
+			name: "delimiters escaped",
+			args: args{v: OptionInput("United States/(a)<b>[c]{d}%e")},
+			want: "United#20States#2f#28a#29#3cb#3e#5bc#5d#7bd#7d#25e",
+		},
+		{
+			name: "latin-1 as one byte",
+			args: args{v: OptionInput("España")},
+			want: "Espa#f1a",
+		},
+		{
+			name: "utf-8 name as listed by pdftk",
+			args: args{v: OptionInput("S\u00c3\u00ad")},
+			want: "S#c3#ad",
+		},
+		{
+			name: "invalid utf-8 bytes kept",
+			args: args{v: OptionInput("Espa\xf1a")},
+			want: "Espa#f1a",
+		},
+		{
+			name:    "above latin-1",
+			args:    args{v: OptionInput("車")},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := escapeOptionedInput(tt.args.v); got != tt.want {
+			got, err := escapeOptionedInput(tt.args.v)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("escapeOptionedInput() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
 				t.Errorf("escapeOptionedInput()\nresult = %q,\n\twant = %q", got, tt.want)
 			}
 		})
@@ -172,7 +203,7 @@ func Test_writeFields(t *testing.T) {
 					"str":    "é",
 					"strer":  stringer("ñ"),
 					"field":  Field{ReadOnly: true, Value: "ü"},
-					"option": OptionInput("Ja"),
+					"option": OptionInput("Sí"),
 				},
 				keys:         []string{"str", "strer", "field", "option"},
 				parentPrefix: "",
@@ -180,8 +211,17 @@ func Test_writeFields(t *testing.T) {
 			wantW: `<< /T (str) /V (\376\377\000\351) /ClrF 2 /ClrFf 1 >> ` + "\r" +
 				`<< /T (strer) /V (\376\377\000\361) /ClrF 2 /ClrFf 1 >> ` + "\r" +
 				`<< /T (field) /V (\376\377\000\374) /ClrF 2 /SetFf 1 >> ` + "\r" +
-				`<< /T (option) /V /Ja /ClrF 2 /ClrFf 1 >> ` + "\r",
+				`<< /T (option) /V /S#ed /ClrF 2 /ClrFf 1 >> ` + "\r",
 			wantErr: false,
+		},
+		{
+			name: "option above latin-1",
+			args: args{
+				inputs:       Inputs{"option": OptionInput("車")},
+				keys:         []string{"option"},
+				parentPrefix: "",
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -190,6 +230,9 @@ func Test_writeFields(t *testing.T) {
 			err := writeFields(w, tt.args.inputs, tt.args.keys, tt.args.parentPrefix)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeFields() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
 				return
 			}
 			if gotW := w.String(); gotW != tt.wantW {
