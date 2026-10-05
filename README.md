@@ -1,4 +1,6 @@
 # go-pdftools
+[![CI](https://github.com/patiek/go-pdftools/actions/workflows/ci.yml/badge.svg)](https://github.com/patiek/go-pdftools/actions/workflows/ci.yml)
+
 PDF utilities to fill PDFs via FDF and manipulating them with PDFtk
 
 Requires Go 1.26 or later.

@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # use the Go from setup-go, not a toolchain go.mod asks for
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    name: Test (Go ${{ matrix.go }}, pdftk)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # minimum from go.mod and the latest release
+        go: ['1.26.x', 'stable']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+      - name: Install pdftk-java
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pdftk-java
+          pdftk --version
+      - name: gofmt
+        run: |
+          diff=$(gofmt -d .)
+          if [ -n "$diff" ]; then
+            echo "$diff"
+            exit 1
+          fi
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  test-other:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: go vet ./...
+      # pdftk is not installed, so only tests using the fake pdftk run
+      - run: go test ./...
+
+  docker:
+    name: Sample Dockerfile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # builds the image and runs the tests against Debian's pdftk-java
+      - run: docker build .
