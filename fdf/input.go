@@ -18,6 +18,9 @@ type Inputs map[string]any
 //
 //	OptionInput("Yes") // checked
 //	OptionInput("Off") // unchecked
+//
+// Options are written as Latin-1 to match how pdftk lists them, or as UTF-8 if
+// they have characters above U+00FF. Use a string for such a dropdown value.
 type OptionInput string
 
 // A Field can be used as an input for any value to set additional flags for the input.
